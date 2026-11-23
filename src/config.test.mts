@@ -209,7 +209,7 @@ describe("the sandboxes of Sandcastle 0.12", () => {
       imageName: "agent-image",
       containerUid: 1000,
       selinuxLabel: "off",
-      mounts: [{ hostPath: "~/.cache", sandboxPath: "~/.cache", readonly: true }],
+      mounts: [{ hostPath: tmpdir(), sandboxPath: "~/.cache", readonly: true }],
       network: ["agents"],
       groups: ["docker"],
       devices: ["/dev/fuse"],
