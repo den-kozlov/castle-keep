@@ -1,0 +1,73 @@
+{
+  "name": "castle-keep",
+  "version": "0.1.0",
+  "description": "An endless loop of coding agents over the ready tasks of a repo, on top of Sandcastle: plan, implement, review, merge.",
+  "keywords": [
+    "sandcastle",
+    "claude-code",
+    "agents",
+    "orchestrator",
+    "ai",
+    "coding-agent",
+    "github-issues",
+    "tui"
+  ],
+  "license": "MIT",
+  "author": "den-kozlov",
+  "homepage": "https://github.com/den-kozlov/castle-keep#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/den-kozlov/castle-keep.git"
+  },
+  "bugs": {
+    "url": "https://github.com/den-kozlov/castle-keep/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "castle-keep": "dist/bin.mjs"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run build",
+    "test": "tsx --test \"src/**/*.test.mts\" \"test/**/*.test.mts\"",
+    "prepack": "npm run build",
+    "castle": "npm run build && node scripts/snapshot.mjs && node .sandcastle/run/dist/bin.mjs run"
+  },
+  "peerDependencies": {
+    "@ai-hero/sandcastle": "^0.12.0",
+    "ink": "^8.0.0",
+    "react": "^19.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@ai-hero/sandcastle": "^0.12.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "ink": "^8.0.0",
+    "ink-testing-library": "^4.0.0",
+    "react": "^19.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.0",
+    "zod": "^4.0.0"
+  }
+}

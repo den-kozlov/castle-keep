@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tgz
+
+# castle-keep on this repo: secrets, logs, worktrees and the run lock stay local.
+.sandcastle/.env
+.sandcastle/logs/
+.sandcastle/worktrees/
+.sandcastle/run.pid
+.sandcastle/run/
+.worktrees/

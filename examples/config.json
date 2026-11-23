@@ -1,0 +1,22 @@
+{
+  "source": { "module": "github" },
+  "sandbox": { "module": "no-sandbox" },
+  "roles": {
+    "planner": { "agent": "claude-code", "model": "claude-haiku-5-5" },
+    "implementer": { "agent": "claude-code", "model": "claude-sonnet-5-5", "effort": "high" },
+    "reviewer": { "agent": "claude-code", "model": "claude-opus-5-5" },
+    "merger": { "agent": "claude-code", "model": "claude-haiku-5-5" }
+  },
+  "prompts": {
+    "plan": "./.sandcastle/plan-prompt.md",
+    "implement": "./.sandcastle/implement-prompt.md",
+    "review": "./.sandcastle/review-prompt.md",
+    "merge": "./.sandcastle/merge-prompt.md"
+  },
+  "gates": ["npm test"],
+  "hooks": {
+    "sandbox.worktreeBuildup": ["npm ci"],
+    "host.worktreeTeardown": ["rm -rf \"$CASTLE_KEEP_WORKTREE/node_modules\""]
+  },
+  "plugins": []
+}
