@@ -28,6 +28,6 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+      # Trusted publishing (OIDC, no token) needs npm 11.5.1 or later.
+      - run: npm install -g npm@^11.5.1
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
