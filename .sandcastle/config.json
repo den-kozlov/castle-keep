@@ -57,6 +57,12 @@
     },
     {
       "module": "orca"
+    },
+    {
+      "module": "graft",
+      "sourceDirs": [
+        "src"
+      ]
     }
   ]
 }
