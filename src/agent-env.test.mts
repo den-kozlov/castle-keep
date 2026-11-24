@@ -40,7 +40,7 @@ describe("the env that reaches each agent after the pre-start hooks", () => {
       const { command } = agent.buildPrintCommand({ prompt: "hi", dangerouslySkipPermissions: false });
       assert.ok(command.includes(`'PATH=/hook/bin:${sandboxEnv.PATH}'`), command);
       assert.ok(command.includes("'HOOK_KEY=added'"), command);
-      assert.equal(command.split("KEEP=").length - 1, 0, "an equal key is not set again");
+      assert.ok(!command.includes("KEEP="), "an equal key is not set again");
     });
   }
 });
