@@ -40,8 +40,8 @@ const schema = z.object({
 });
 
 const tmpRepo = () => mkdtempSync(join(tmpdir(), "castle-keep-settings-"));
-const initIn = async (cwd: string, source: string) => {
-  const code = await runInit(["--source", source, "--gate", "npm test"], { cwd, tty: false, out: () => {}, err: () => {} });
+const initIn = async (cwd: string, source: string, ...more: string[]) => {
+  const code = await runInit(["--source", source, "--gate", "npm test", ...more], { cwd, tty: false, out: () => {}, err: () => {} });
   assert.equal(code, 0);
   return join(cwd, ".sandcastle/config.json");
 };
@@ -244,7 +244,7 @@ describe("SettingsWindow", () => {
 describe("Wizard", () => {
   it("writes the same config as init with the same choices", async () => {
     const viaInit = tmpRepo();
-    await initIn(viaInit, "local_md");
+    await initIn(viaInit, "local_md", "--hook", "sandbox.worktreeBuildup=npm ci");
 
     const viaWizard = tmpRepo();
     let written: boolean | undefined;
@@ -258,10 +258,13 @@ describe("Wizard", () => {
     for (let i = 0; i < 4; i++) await press(app.stdin, DOWN, DOWN, DOWN, ENTER);
     // one gate.
     await press(app.stdin, ENTER, ...typed("npm test"), ENTER, DOWN, ENTER);
-    assert.match(app.lastFrame() ?? "", /Goes on to the plugins/);
+    assert.match(app.lastFrame() ?? "", /Goes on with these checks/);
     await press(app.stdin, DOWN);
     assert.match(app.lastFrame() ?? "", /Asks one more command/);
     await press(app.stdin, "k", ENTER);
+    // the command that prepares each worktree.
+    assert.match(app.lastFrame() ?? "", /prepare each worktree/);
+    await press(app.stdin, ENTER, ...typed("npm ci"), ENTER, DOWN, ENTER);
     // plugins under local_md: each form, Save with the switch off (enabled is its first row).
     for (let i = 0; i < 4 && written === undefined; i++) {
       if (!/plugin:/.test(app.lastFrame() ?? "")) break;

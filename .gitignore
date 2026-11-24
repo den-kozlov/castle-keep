@@ -4,8 +4,12 @@ dist/
 
 # castle-keep on this repo: secrets, logs, worktrees and the run lock stay local.
 .sandcastle/.env
+.sandcastle/.env.example
 .sandcastle/logs/
 .sandcastle/worktrees/
 .sandcastle/run.pid
 .sandcastle/run/
 .worktrees/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
