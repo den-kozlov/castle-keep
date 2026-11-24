@@ -20,7 +20,7 @@ interface ToolRule {
   files: string[];
 }
 
-// modules.mts is the registry of every module; the tests of config and hooks name the modules they load;
+// modules.mts is the registry of every module; the tests of config, hooks and the agent env name the modules they load;
 // the config of this repo and the test of the built exports list modules too.
 const LISTS_MODULES = ["README.md", "src/index.mts", "package.json", ".sandcastle/config.json", "test/dist.test.mts", "src/modules.mts", "src/config.test.mts", "src/agent-env.test.mts", "src/hooks.test.mts", "examples/config.json", "src/settings.test.mts"];
 const GRAFT: ToolRule = { names: /graft/, files: ["src/plugins/graft.mts", "src/plugins/graft.test.mts"] };
