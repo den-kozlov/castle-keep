@@ -37,6 +37,7 @@ const schema = z.object({
   mode: z.enum(["fast", "slow"]),
   extra: z.string().optional().meta({ dependsOn: "on" }),
   dirs: z.array(z.string()),
+  sizes: z.array(z.number()),
 });
 
 const tmpRepo = () => mkdtempSync(join(tmpdir(), "castle-keep-settings-"));
@@ -48,7 +49,7 @@ const initIn = async (cwd: string, source: string, ...more: string[]) => {
 
 describe("Form", () => {
   const mount = (onSave = (_: Record<string, unknown>) => undefined as string | undefined | void) =>
-    render(createElement(Form, { title: "t", schema, value: { name: "a", dirs: ["x"] }, onSave, onCancel: () => {} }));
+    render(createElement(Form, { title: "t", schema, value: { name: "a", dirs: ["x"], sizes: [1] }, onSave, onCancel: () => {} }));
 
   it("renders a field per schema entry, a default, and a read-only field with a hint", async () => {
     const app = mount();
@@ -57,7 +58,8 @@ describe("Form", () => {
     assert.match(frame, /count: 3/);
     assert.match(frame, /on: false/);
     assert.match(frame, /mode: fast/);
-    assert.match(frame, /dirs: \["x"\]  \(edit the file\)/);
+    assert.match(frame, /dirs: x +│/);
+    assert.match(frame, /sizes: \[1\]  \(edit the file\)/);
     assert.doesNotMatch(frame, /extra/);
     app.unmount();
   });
@@ -74,7 +76,7 @@ describe("Form", () => {
     const saved: unknown[] = [];
     const app = mount((v) => void saved.push(v));
     // count: edit, drop the "3", type 0, end the edit, go to Save.
-    await press(app.stdin, DOWN, ENTER, BACKSPACE, "0", ENTER, DOWN, DOWN, DOWN, DOWN, ENTER);
+    await press(app.stdin, DOWN, ENTER, BACKSPACE, "0", ENTER, DOWN, DOWN, DOWN, DOWN, DOWN, ENTER);
     const frame = app.lastFrame() ?? "";
     assert.match(frame, /count: 0/);
     assert.match(frame, /Too small/i);
@@ -86,10 +88,11 @@ describe("Form", () => {
   it("hands a valid value to onSave", async () => {
     const saved: Record<string, unknown>[] = [];
     const app = mount((v) => void saved.push(v));
-    await press(app.stdin, DOWN, ENTER, BACKSPACE, "7", ENTER, DOWN, DOWN, DOWN, DOWN, ENTER);
+    await press(app.stdin, DOWN, ENTER, BACKSPACE, "7", ENTER, DOWN, DOWN, DOWN, ENTER, ...typed(", y ,,z"), ENTER, DOWN, DOWN, ENTER);
     assert.equal(saved.length, 1);
     assert.equal(saved[0]!.count, 7);
-    assert.deepEqual(saved[0]!.dirs, ["x"]);
+    assert.deepEqual(saved[0]!.dirs, ["x", "y", "z"]);
+    assert.deepEqual(saved[0]!.sizes, [1]);
     app.unmount();
   });
 });

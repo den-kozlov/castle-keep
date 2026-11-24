@@ -403,8 +403,9 @@ Bundled plugins, all opt-in:
   [OpenRouter](https://openrouter.ai) whether a cheap model can finish a task alone, and picks
   `cheapModel` for the implementer when P(yes) ≥ `easyThreshold` (default 0.9). Needs
   `OPENROUTER_API_KEY`. Without `cheapModel` the plugin does nothing.
-- **`graft`** (`sourceDirs`): denies `grep` over the source directories and names the
-  [graft](https://www.npmjs.com/package/@nanonets/graft) command instead.
+- **`graft`** (`sourceDirs`, optional): denies `grep` over the source directories and names the
+  [graft](https://www.npmjs.com/package/@nanonets/graft) command instead. Without
+  `sourceDirs` it denies only a search of source files by extension (`.ts`, `.mts`, `.rs`, ...).
 - **`orca`**: shows worktrees and agent logs on the [Orca](https://github.com/stablyai/orca)
   board.
 

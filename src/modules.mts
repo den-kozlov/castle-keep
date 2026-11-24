@@ -174,7 +174,7 @@ export const plugins: Record<string, Module<z.ZodType, Plugin>> = {
   ),
   orca: module_(z.object({}).strict().describe("Shows the worktrees and agent logs on the Orca board."), () => orcaPlugin()),
   graft: module_(
-    z.object({ sourceDirs: z.array(text).describe("The directories where grep is denied in favour of graft.") })
+    z.object({ sourceDirs: z.array(text).default([]).describe("The directories where grep is denied in favour of graft, comma-separated; without them only a search of source files by extension is denied.") })
       .strict()
       .describe("Points the agents from grep to the graft index of the source directories."),
     (s) => graftPlugin(s),

@@ -1,12 +1,13 @@
 // The fields of a `zod` object schema, as a form edits them.
-// Strings, numbers, booleans, enums and the optional, defaulted and nullable forms of them are
-// editable; any other field type is read-only and keeps its value. A field may carry
+// Strings, numbers, booleans, enums, lists of strings and the optional, defaulted and nullable
+// forms of them are editable; any other field type is read-only and keeps its value. A list is
+// edited as one line, its items split by commas. A field may carry
 // `.meta({ dependsOn: "<boolean field>" })`: it shows only while that switch is on.
 // `.describe(...)` on a field, or on any wrapper of it, is the help line of its row.
 
 import type { z } from "zod";
 
-export type FieldKind = "string" | "number" | "boolean" | "enum" | "readonly";
+export type FieldKind = "string" | "number" | "boolean" | "enum" | "list" | "readonly";
 
 export interface Field {
   name: string;
@@ -26,6 +27,7 @@ interface Def {
   type: string;
   innerType?: z.ZodType & { _zod: { def: Def } };
   entries?: Record<string, string>;
+  element?: z.ZodType;
   defaultValue?: unknown;
 }
 
@@ -53,7 +55,7 @@ export function fieldsOf(schema: z.ZodObject): Field[] {
     else if (def.type === "enum") {
       out.kind = "enum";
       out.options = Object.values(def.entries ?? {});
-    }
+    } else if (def.type === "array" && def.element && defOf(def.element).type === "string") out.kind = "list";
     return out;
   });
 }
@@ -68,6 +70,7 @@ export function draftOf(schema: z.ZodObject, value: Record<string, unknown>): Dr
     const given = value[field.name] ?? field.defaultValue;
     if (field.kind === "readonly") draft[field.name] = value[field.name];
     else if (field.kind === "boolean") draft[field.name] = given === true ? "true" : "false";
+    else if (field.kind === "list") draft[field.name] = Array.isArray(given) ? given.join(", ") : "";
     else if (field.kind === "enum") draft[field.name] = given === undefined || given === null ? (field.optional ? "" : field.options[0] ?? "") : String(given);
     else draft[field.name] = given === undefined || given === null ? "" : String(given);
   }
@@ -91,6 +94,10 @@ export function parseDraft(schema: z.ZodObject, draft: Draft): Parsed {
     const raw = draft[field.name];
     if (field.kind === "readonly") input[field.name] = raw;
     else if (field.kind === "boolean") input[field.name] = raw === "true";
+    else if (field.kind === "list") {
+      const items = String(raw ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+      input[field.name] = items.length === 0 && field.optional ? undefined : items;
+    }
     else if (raw === "" || raw === undefined) input[field.name] = field.nullable ? null : undefined;
     else input[field.name] = field.kind === "number" ? Number(raw) : raw;
   }
