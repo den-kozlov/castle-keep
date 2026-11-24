@@ -1,6 +1,6 @@
 {
   "name": "castle-keep",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An endless loop of coding agents over the ready tasks of a repo, on top of Sandcastle: plan, implement, review, merge.",
   "keywords": [
     "sandcastle",
