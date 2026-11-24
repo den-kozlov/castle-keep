@@ -64,7 +64,7 @@ and [prompts](https://github.com/mattpocock/sandcastle/blob/main/docs/guide/prom
 - **A TUI.** One row per agent with its task, model and context, and the header meters of the
   plugins. See [The TUI](#the-tui).
 - **A config as data.** One JSON file, read at the start of every iteration. Press `c` to edit it
-  in the TUI. A change needs no restart.
+  in the TUI. Most changes need no restart.
 - **Two ways to a human.** An implementer that needs a decision ends with a question. A reviewer
   that finds a wrong design blocks the branch. In both cases castle-keep moves the task to
   `ready-for-human` and writes the reason in a comment.
@@ -313,9 +313,20 @@ start and names the problem.
 <details>
 <summary><b>The config file</b></summary>
 
-castle-keep reads `.sandcastle/config.json` at the start of every iteration. A missing or broken
-file keeps the last good read. A broken first read stops the start and names the field that
-failed.
+castle-keep reads `.sandcastle/config.json` before every poll of the tracker and at the start of
+every iteration. A missing or broken file keeps the last good read. A broken first read stops the
+start and names the field that failed.
+
+Most settings follow the file without a restart. The modules have their own rule:
+
+| Change in the file | When it takes effect |
+| --- | --- |
+| Roles, prompts, gates, hooks, `env`, `parallelism`, timeouts | At the next read. |
+| A plugin is switched **off** | At the next read. From then on the plugin runs nothing: no hook, no gate, no task, no header, no event. |
+| A plugin is switched **on**, or its settings change | After a restart. |
+| The source or the sandbox changes | After a restart. |
+
+A plugin without an entry in `plugins[]` is never built: it does nothing in a run.
 
 - `source`, `sandbox`, `plugins[]`: `{ "module": "<name>", ...settings }`. Each module declares its
   settings with a `zod` schema ([modules](https://github.com/den-kozlov/castle-keep/blob/main/src/modules.mts)).
@@ -391,7 +402,7 @@ Bundled plugins, all opt-in:
 - **`jev`** (`project`, `cheapModel`, `easyThreshold`): asks Jev through
   [OpenRouter](https://openrouter.ai) whether a cheap model can finish a task alone, and picks
   `cheapModel` for the implementer when P(yes) ≥ `easyThreshold` (default 0.9). Needs
-  `OPENROUTER_API_KEY`.
+  `OPENROUTER_API_KEY`. Without `cheapModel` the plugin does nothing.
 - **`graft`** (`sourceDirs`): denies `grep` over the source directories and names the
   [graft](https://www.npmjs.com/package/@nanonets/graft) command instead.
 - **`orca`**: shows worktrees and agent logs on the [Orca](https://github.com/stablyai/orca)
@@ -415,7 +426,7 @@ A plugin is a plain object ([types](https://github.com/den-kozlov/castle-keep/bl
 <summary><b>Design</b></summary>
 
 - **The config is data.** One JSON file, kept in the repo and read at every iteration. The TUI
-  edits it, a schema checks it, and a change takes effect without a restart. What is special to
+  edits it, a schema checks it, and most changes take effect without a restart. What is special to
   a project goes into hooks, prompts and gates, not into the package.
 - **Secrets stay out of the file.** Keys go in `.sandcastle/.env` or the process environment.
 - **Four module kinds**, each with a `zod` schema: one task source, one sandbox, one agent per

@@ -7,9 +7,13 @@
 // strong model.
 //
 // The strong model is the implementer role and the cheap one `cheapModel` of this
-// plugin in the config file. Without `cheapModel` the pilot is off. The plugin
-// sets the model in its pre-start hook and notes the score on the agent row.
-// Only the implementer changes; the other roles keep their own models.
+// plugin in the config file. The plugin sets the model in its pre-start hook and
+// notes the score on the agent row. Only the implementer changes; the other
+// roles keep their own models.
+//
+// Without `cheapModel` there is nothing to pick: the plugin adds no hook, so it
+// never runs and says nothing. The same holds for an implementer whose model
+// already is the cheap one.
 //
 // The default threshold 0.9 is conservative and not tuned.
 //
@@ -62,8 +66,6 @@ export type EasyAsker = (issue: IssueText) => Promise<number>;
 export interface TierOptions {
   strongModel: string;
   cheapModel: string;
-  /** False turns the pilot off: no question to Jev. Defaults to true. */
-  pilot?: boolean;
   /** Defaults to Jev through OpenRouter, or undefined when there is no key. */
   ask?: EasyAsker;
   /** What the project is, one or two sentences, put in front of the question. */
@@ -97,12 +99,6 @@ export async function assignTiers(
   options: TierOptions,
 ): Promise<Map<string, Tier>> {
   const tiers = new Map<string, Tier>();
-  if (options.pilot === false) {
-    for (const issue of issues) {
-      tiers.set(issue.id, { model: options.strongModel, note: "pilot off: no cheapModel" });
-    }
-    return tiers;
-  }
   const ask = options.ask ?? jevAsker(options.project ?? "");
 
   await Promise.all(
@@ -158,7 +154,7 @@ export function pilotOn(strongModel: string, cheapModel: string | null): boolean
 export interface JevOptions {
   /** What the project is, one or two sentences, put in front of the question. */
   project?: string;
-  /** The cheaper implementer model; null or absent leaves the pilot off. */
+  /** The cheaper implementer model; with null or none the plugin has no hook and never runs. */
   cheapModel?: string | null;
   /** At or above this P(yes) the implementer runs on the cheap model. */
   easyThreshold?: number;
@@ -168,14 +164,17 @@ export interface JevOptions {
 
 /** The plugin: Jev picks the model of the implementer of each issue, in its pre-start hook. */
 export function jevPilot(options: JevOptions): Plugin {
+  const cheapModel = options.cheapModel ?? null;
+  // Nothing to pick: no hook, so the plugin does no work and writes no note.
+  if (cheapModel === null) return { name: "jev" };
   return {
     name: "jev",
     async preStart({ role, task, proposed }) {
       if (role !== "implementer" || !task) return undefined;
+      if (!pilotOn(proposed.model, cheapModel)) return undefined;
       const tiers = await assignTiers([task], {
         strongModel: proposed.model,
-        cheapModel: options.cheapModel ?? proposed.model,
-        pilot: pilotOn(proposed.model, options.cheapModel ?? null),
+        cheapModel,
         project: options.project,
         threshold: options.easyThreshold,
         ask: options.ask,

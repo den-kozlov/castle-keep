@@ -17,7 +17,7 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
 import { format } from "node:util";
 import { Control } from "./control.mts";
-import { CONFIG_FILE, createConfigReader, type Harness } from "./config.mts";
+import { CONFIG_FILE, createConfigReader, type ConfigReader, type Harness } from "./config.mts";
 import { runLoop } from "./engine.mts";
 import { formatLine, type RunEvent } from "./events.mts";
 import { readCheckout } from "./git.mts";
@@ -150,11 +150,22 @@ export async function runSandcastle(configFile = CONFIG_FILE): Promise<never> {
   // Plugins that show the run elsewhere start before its first event.
   await harness.listeners.onRunStart();
 
+  // The events go to the listeners of the newest good read: a plugin that is
+  // off in the file gets no event after it.
+  let current = harness;
+  const followed: ConfigReader = {
+    read() {
+      const read = reader.read();
+      if (read.ok) current = read.harness;
+      return read;
+    },
+  };
+
   const emit = (event: RunEvent) => {
     const line = formatLine(event);
     if (line !== undefined) journal(line.trim());
     view(event);
-    harness.listeners.onEvent(event);
+    current.listeners.onEvent(event);
   };
 
   control.onChange(() => emit({ type: "stop", request: control.stop }));
@@ -179,7 +190,7 @@ export async function runSandcastle(configFile = CONFIG_FILE): Promise<never> {
 
   let exitCode = 0;
   try {
-    await runLoop({ harness, reader, mode, maxIterations, base, control, logRun, emit });
+    await runLoop({ harness, reader: followed, mode, maxIterations, base, control, logRun, emit });
   } catch (error) {
     exitCode = 1;
     emit({ type: "notice", level: "error", text: `run failed: ${(error as Error).stack ?? error}` });

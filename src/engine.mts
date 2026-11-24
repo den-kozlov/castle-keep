@@ -239,7 +239,14 @@ export async function runLoop(options: LoopOptions): Promise<void> {
   const shown = new Map<string, string>();
   const check = async (event: GateEvent): Promise<GateAnswer> => {
     const answer = await h.gate(event);
-    for (const { plugin, elements } of h.header()) {
+    const slots = h.header();
+    // The slot of a plugin that is gone from the harness is emptied.
+    for (const plugin of [...shown.keys()]) {
+      if (slots.some((slot) => slot.plugin === plugin)) continue;
+      shown.delete(plugin);
+      emit({ type: "header", plugin, elements: [] });
+    }
+    for (const { plugin, elements } of slots) {
       const key = JSON.stringify(elements);
       if (shown.get(plugin) === key) continue;
       shown.set(plugin, key);
@@ -280,6 +287,23 @@ export async function runLoop(options: LoopOptions): Promise<void> {
   });
   const hold = (): Hold => ({ deps, check, wait, context, gateEvent });
 
+  // Reads the config again. A broken file keeps the last good read; the same
+  // error is told once. A plugin that is off in the file is gone from the new
+  // harness, which is told once too.
+  const refresh = () => {
+    const configRead = options.reader.read();
+    if (configRead.ok) {
+      for (const name of h.plugins) {
+        if (!configRead.harness.plugins.includes(name)) notice(`plugin ${name} is off in the config: it runs no more`);
+      }
+      h = configRead.harness;
+      configError = undefined;
+    } else if (configRead.reason !== configError) {
+      configError = configRead.reason;
+      notice(`config not read, the last good one stays: ${configRead.reason}`, "warn");
+    }
+  };
+
   try {
     while (control.stop === "none") {
       if (!endless && iteration >= options.maxIterations) {
@@ -287,6 +311,8 @@ export async function runLoop(options: LoopOptions): Promise<void> {
         break;
       }
 
+      // Before every poll, so a run without work follows the file too.
+      refresh();
       emit({ type: "phase", phase: "poll" });
 
       // The periodic tasks of the config; each decides whether it is due.
@@ -324,16 +350,8 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 
       iteration++;
       const logs = logRun.startIteration(iteration);
-      // The config of this iteration. A broken file keeps the last good read;
-      // the same error is told once.
-      const configRead = options.reader.read();
-      if (configRead.ok) {
-        h = configRead.harness;
-        configError = undefined;
-      } else if (configRead.reason !== configError) {
-        configError = configRead.reason;
-        notice(`config not read, the last good one stays: ${configRead.reason}`, "warn");
-      }
+      // The config of this iteration: the gates above may have held the loop for hours.
+      refresh();
       await h.lifecycle("iterationStart", context(), { iteration });
       try {
         emit({ type: "phase", phase: "plan", iteration });

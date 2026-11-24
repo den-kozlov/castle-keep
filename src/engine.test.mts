@@ -33,9 +33,12 @@ const harnessWith = (plugins: Plugin[], source: MemorySource): Harness => {
 };
 
 /** A run on fakes. `calls` lists the agents that started, in order. */
-function rig(plugins: Plugin[], mode: "batch" | "endless", opts: { signal?: string } = {}) {
+function rig(plugins: Plugin[], mode: "batch" | "endless", opts: { signal?: string; later?: Plugin[] } = {}) {
   const source = memorySource([{ id: "1", title: "t", body: "b" }]);
   const harness = harnessWith(plugins, source);
+  // `later`: the plugins the config names from its second read on.
+  const laterHarness = opts.later ? harnessWith(opts.later, source) : harness;
+  let reads = 0;
   const control = new Control();
   const events: RunEvent[] = [];
   const calls: string[] = [];
@@ -78,7 +81,7 @@ function rig(plugins: Plugin[], mode: "batch" | "endless", opts: { signal?: stri
   const run = () =>
     runLoop({
       harness,
-      reader: { read: () => ({ ok: true, harness }) },
+      reader: { read: () => ({ ok: true, harness: reads++ === 0 ? harness : laterHarness }) },
       mode,
       maxIterations: 1,
       base: "main",
@@ -165,6 +168,27 @@ describe("a closed gate in the loop", () => {
     setTimeout(() => r.control.requestSoft(), 30);
     await done;
     assert.deepEqual(r.calls, []);
+  });
+});
+
+describe("a plugin that is off in the config", () => {
+  it("runs no more from the next read: no gate, no pre-start hook, no lifecycle hook, and its header slot is emptied", async () => {
+    const asked: string[] = [];
+    const off: Plugin = {
+      name: "off",
+      gate: { check: (event) => (asked.push(`gate ${event.step}`), { open: true }) },
+      preStart: ({ role }) => (asked.push(`preStart ${role}`), undefined),
+      lifecycle: { iterationStart: () => void asked.push("iterationStart"), runEnd: () => void asked.push("runEnd") },
+      header: () => [{ kind: "text", text: "on" }],
+    };
+    // The first read still names the plugin; the read at the start of the iteration does not.
+    const r = rig([off], "batch", { later: [] });
+    await r.run();
+    assert.deepEqual(r.calls, ["planner", "implementer", "reviewer", "merger"]);
+    assert.deepEqual([...new Set(asked)], ["gate periodic", "gate poll", "gate plan"], "nothing of the plugin runs after the read without it");
+    assert.equal(notices(r.events).filter((text) => /plugin off is off in the config: it runs no more/.test(text)).length, 1);
+    const slots = r.events.flatMap((e) => (e.type === "header" && e.plugin === "off" ? [e.elements.length] : []));
+    assert.deepEqual(slots, [1, 0]);
   });
 });
 

@@ -436,16 +436,28 @@ export interface ConfigReader {
 /**
  * The reader of the config file. The modules (source, sandbox, plugins) are built
  * by the first read and stay until a restart; everything else follows the file.
+ *
+ * One change of the modules follows the file too: a plugin the file no longer
+ * names is off. It is left out of the harness from that read on, so no hook,
+ * gate, task, header or listener of it runs. A plugin the first read did not
+ * build is never built: a new entry, like new settings of a module, waits for a restart.
  */
 export function createConfigReader(path: string, cwd = process.cwd()): ConfigReader {
   let carried: Carried | undefined;
+  /** The module of each carried plugin, in the order of `carried.plugins`. */
+  let built: string[] = [];
   let last: Harness | undefined;
   return {
     read() {
       try {
         const parsed = parseConfig(readFileSync(path, "utf8"));
-        carried ??= carry(parsed);
-        last = resolveHarness(parsed, carried, cwd);
+        if (!carried) {
+          carried = carry(parsed);
+          built = parsed.plugins.map((p) => p.module);
+        }
+        const named = new Set(parsed.plugins.map((p) => p.module));
+        const plugins = carried.plugins.filter((_, i) => named.has(built[i]!));
+        last = resolveHarness(parsed, { ...carried, plugins }, cwd);
         return { ok: true, harness: last };
       } catch (error) {
         const reason = error instanceof ConfigError ? error.message : `${path}: ${(error as Error).message.split("\n")[0]}`;

@@ -182,7 +182,7 @@ export const plugins: Record<string, Module<z.ZodType, Plugin>> = {
   jev: module_(
     z.object({
       project: text.optional().describe(`What the project is, one or two sentences, put in front of the question: "${EASY_QUESTION}"`),
-      cheapModel: text.nullable().default(null).describe("The model of an easy implementer task; the pilot is off when not set."),
+      cheapModel: text.nullable().default(null).describe("The model of an easy implementer task; without it the plugin does nothing."),
       easyThreshold: z.number().min(0).max(1).default(EASY_THRESHOLD).describe(`The P(yes) at or above which the cheap model runs; default ${EASY_THRESHOLD}.`),
     }).strict().describe("Jev (through OpenRouter) picks a cheap implementer model for an easy task."),
     (s) => jevPilot(s),
