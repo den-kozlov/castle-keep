@@ -47,23 +47,6 @@ describe("assignTiers", () => {
   });
 });
 
-describe("assignTiers without the pilot", () => {
-  it("keeps every issue on the strong model and asks nothing", async () => {
-    let asked = 0;
-    const tiers = await assignTiers([{ id: "1", title: "small", body: "" }], {
-      strongModel: "strong",
-      cheapModel: "cheap",
-      pilot: false,
-      ask: async () => {
-        asked++;
-        return 0;
-      },
-    });
-    assert.equal(tiers.get("1")?.model, "strong");
-    assert.equal(asked, 0);
-  });
-});
-
 describe("pilotOn", () => {
   it("is off without a cheap model or with the same model", () => {
     assert.equal(pilotOn("i", null), false);
@@ -95,13 +78,23 @@ describe("jevPilot", () => {
     assert.equal((await lenient.preStart!(start("implementer")))?.model, "cheap");
   });
 
-  it("leaves the other roles alone and keeps the strong model without a cheap one", async () => {
+  it("leaves the other roles alone", async () => {
     const asked: number[] = [];
     const plugin = jevPilot({ cheapModel: "cheap", ask: async () => (asked.push(1), 1) });
     assert.equal(await plugin.preStart!(start("reviewer")), undefined);
     assert.equal(asked.length, 0);
-    const off = jevPilot({});
-    assert.equal((await off.preStart!(start("implementer")))?.model, "strong");
+  });
+
+  it("has no hook without a cheap model: it never runs and writes no note", () => {
+    assert.deepEqual(Object.keys(jevPilot({})), ["name"]);
+    assert.deepEqual(Object.keys(jevPilot({ cheapModel: null })), ["name"]);
+  });
+
+  it("asks nothing and changes nothing when the implementer already runs on the cheap model", async () => {
+    const asked: number[] = [];
+    const same = jevPilot({ cheapModel: "strong", ask: async () => (asked.push(1), 1) });
+    assert.equal(await same.preStart!(start("implementer")), undefined);
+    assert.equal(asked.length, 0);
   });
 });
 

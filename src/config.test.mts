@@ -148,6 +148,35 @@ describe("the reader", () => {
     assert.ok(d.ok);
     assert.equal(d.harness.roles.implementer.model, "third");
   });
+
+  it("leaves out a plugin that is off in the file, and never builds one the first read did not have", () => {
+    const withPlugins = (...modules: string[]) => writeFileSync(path, JSON.stringify({ ...base(), plugins: modules.map((module) => ({ module })) }));
+    const names = (reader: ReturnType<typeof createConfigReader>) => {
+      const read = reader.read();
+      assert.ok(read.ok);
+      return read.harness.plugins;
+    };
+    const reader = createConfigReader(path, dir);
+    withPlugins("jev", "claude-limits");
+    assert.deepEqual(names(reader), ["jev", "claude-limits"]);
+
+    // Off: the entry is gone, and so is every hook, gate and header of the plugin.
+    withPlugins("claude-limits");
+    const off = reader.read();
+    assert.ok(off.ok);
+    assert.deepEqual(off.harness.plugins, ["claude-limits"]);
+    assert.deepEqual(off.harness.header().map((slot) => slot.plugin), ["claude-limits"]);
+
+    // On again in the same run: the plugin of the start comes back.
+    withPlugins("jev", "claude-limits");
+    assert.deepEqual(names(reader), ["jev", "claude-limits"]);
+
+    // New in the file: not built until a restart.
+    withPlugins("jev", "claude-limits", "orca");
+    assert.deepEqual(names(reader), ["jev", "claude-limits"]);
+    withPlugins();
+    assert.deepEqual(names(reader), []);
+  });
 });
 
 describe("the plugin seams of the harness", () => {
