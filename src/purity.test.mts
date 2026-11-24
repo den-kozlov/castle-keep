@@ -2,14 +2,16 @@
 // so the core, the prompts and the README work with any tracker, agent and plugin set.
 
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-// The whole repo, but for installed, built and run-time files and the lock file (a list of packages).
+// The files git sees (tracked, and new ones not ignored), but for the lock file (a list of packages):
+// installed, built, run-time and local tool files are ignored.
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const SKIPPED = ["node_modules", "dist", ".git", ".worktrees", ".sandcastle/run", ".sandcastle/logs", ".sandcastle/worktrees", "package-lock.json"];
+const SKIPPED = ["package-lock.json"];
 
 // A tool name is allowed only in the files of its own module. `gh` and `bd` are
 // short: they match as whole words only.
@@ -51,13 +53,14 @@ function toolNamesOutside(files: Record<string, string>): string[] {
   return found;
 }
 
-function sources(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(dir, entry.name);
-    if (SKIPPED.includes(relative(ROOT, path))) return [];
-    if (entry.isDirectory()) return sources(path);
-    return /\.(mts|tsx|mjs|md|json|yml|example)$/.test(entry.name) ? [path] : [];
-  });
+function sources(root: string): string[] {
+  const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8" });
+  assert.equal(listed.status, 0, listed.stderr);
+  return listed.stdout
+    .split("\n")
+    .filter((name) => name && !SKIPPED.includes(name) && /\.(mts|tsx|mjs|md|json|yml|example)$/.test(name))
+    .map((name) => join(root, name))
+    .filter((path) => existsSync(path));
 }
 
 describe("castle-keep stays generic", () => {

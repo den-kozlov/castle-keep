@@ -89,6 +89,30 @@ describe("castle-keep init", () => {
     assert.ok(!existsSync(join(r.cwd, ".sandcastle/config.json")));
   });
 
+  it("adds the local files of a run to .gitignore once, after the lines already there", async () => {
+    const r = await run(ALL, { setup: (cwd) => writeFileSync(join(cwd, ".gitignore"), "node_modules/\n.sandcastle/.env\n") });
+    assert.equal(r.code, 0, r.err);
+    const text = readFileSync(join(r.cwd, ".gitignore"), "utf8");
+    assert.ok(text.startsWith("node_modules/\n.sandcastle/.env\n"));
+    assert.equal(text.match(/^\.sandcastle\/\.env$/gm)?.length, 1);
+    for (const line of [".sandcastle/logs/", ".sandcastle/worktrees/", ".sandcastle/run.pid"]) assert.ok(text.split("\n").includes(line), line);
+    const again = await runInit([...ALL, "--force"], { cwd: r.cwd, tty: false, out: () => {}, err: () => {} });
+    assert.equal(again, 0);
+    assert.equal(readFileSync(join(r.cwd, ".gitignore"), "utf8"), text);
+  });
+
+  it("takes hook commands as <key>=<command> and prints the next steps", async () => {
+    const r = await run(["--source", "local_md", "--gate", "npm test", "--hook", "sandbox.worktreeBuildup=npm ci", "--hook", "sandbox.worktreeBuildup=npm run build"]);
+    assert.equal(r.code, 0, r.err);
+    const parsed = JSON.parse(readFileSync(join(r.cwd, ".sandcastle/config.json"), "utf8"));
+    assert.deepEqual(parsed.hooks, { "sandbox.worktreeBuildup": ["npm ci", "npm run build"] });
+    assert.match(r.out, /\.sandcastle\/\.env/);
+    assert.match(r.out, /npx castle-keep run/);
+    const bad = await run(["--source", "local_md", "--gate", "npm test", "--hook", "npm ci"]);
+    assert.equal(bad.code, 2);
+    assert.match(bad.err, /--hook: not <key>=<command>/);
+  });
+
   it("rejects an unknown source with the resolver's message", async () => {
     const r = await run(["--source", "nope", "--gate", "x"]);
     assert.equal(r.code, 2);

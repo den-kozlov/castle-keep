@@ -16,7 +16,8 @@ function findConfig(from: string): string | undefined {
   }
 }
 
-const USAGE = `usage: castle-keep init [options]     write .sandcastle/config.json and the prompts (init --help)
+const USAGE = `usage: castle-keep setup               the setup wizard: write .sandcastle/config.json and the prompts
+       castle-keep init [options]     the same without questions, every choice a flag (init --help)
        castle-keep run [--batch] [--iterations N]
                                       start the loop; without a config, a terminal opens the setup wizard
        castle-keep task <view|comment|edit|create|block|needs-human> …
@@ -35,6 +36,18 @@ if (group === "--version" || group === "-v") {
 if (group === "init" && (rest.includes("--help") || rest.includes("-h"))) {
   console.log(INIT_USAGE);
   process.exit(0);
+}
+if (group === "setup") {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.error("castle-keep setup needs a terminal; without one, use castle-keep init (init --help)");
+    process.exit(2);
+  }
+  if (existsSync(CONFIG_FILE)) {
+    console.error(`${CONFIG_FILE} exists: change it in the settings window (c in castle-keep run) or with init --force`);
+    process.exit(1);
+  }
+  const { runSetup } = await import("./wizard.tsx");
+  process.exit(await runSetup(process.cwd()));
 }
 if (group === "run") {
   // Loaded on demand: the loop pulls in Sandcastle and the TUI, which `task` and `init` do not need.

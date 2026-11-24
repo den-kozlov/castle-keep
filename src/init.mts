@@ -5,7 +5,7 @@
 import { parseArgs } from "node:util";
 import { CONFIG_FILE, ConfigError, ROLES } from "./config.mts";
 import { sources } from "./modules.mts";
-import { defaultRoles, PROMPTS, STANDARDS, writeSetup, ENV_EXAMPLE } from "./setup.mts";
+import { defaultRoles, nextSteps, PROMPTS, STANDARDS, writeSetup, ENV_EXAMPLE } from "./setup.mts";
 
 const SOURCE_NAMES = Object.keys(sources).join(", ");
 
@@ -17,6 +17,7 @@ export const INIT_USAGE = `usage: castle-keep init --source <module> --gate <com
   --model <name>           model of every role; --planner-model, --implementer-model,
                            --reviewer-model, --merger-model set one role
   --plugin <name|json>     a plugin by name, or a JSON object {"module": "…", …settings}; repeat
+  --hook <key>=<command>   a hook command, for example "sandbox.worktreeBuildup=npm ci"; repeat
   --base-branch <name>     default main
   --force                  overwrite an existing config and prompts`;
 
@@ -48,6 +49,7 @@ export async function runInit(argv: string[], io: InitIo): Promise<number> {
         "reviewer-model": { type: "string" },
         "merger-model": { type: "string" },
         plugin: { type: "string", multiple: true },
+        hook: { type: "string", multiple: true },
         "base-branch": { type: "string" },
         force: { type: "boolean" },
       },
@@ -73,11 +75,17 @@ export async function runInit(argv: string[], io: InitIo): Promise<number> {
         throw new InitError(`--plugin: not JSON: ${p}`);
       }
     });
+    const hooks: Record<string, string[]> = {};
+    for (const h of values.hook ?? []) {
+      const at = h.indexOf("=");
+      if (at <= 0 || !h.slice(at + 1).trim()) throw new InitError(`--hook: not <key>=<command>: ${h}`);
+      (hooks[h.slice(0, at).trim()] ??= []).push(h.slice(at + 1).trim());
+    }
     let result;
     try {
       result = writeSetup(
         io.cwd,
-        { source: { module: source }, sandbox: { module: values.sandbox ?? "no-sandbox" }, roles, gates, plugins, baseBranch: values["base-branch"] },
+        { source: { module: source }, sandbox: { module: values.sandbox ?? "no-sandbox" }, roles, gates, plugins, hooks, baseBranch: values["base-branch"] },
         values.force,
       );
     } catch (error) {
@@ -89,6 +97,7 @@ export async function runInit(argv: string[], io: InitIo): Promise<number> {
       return 1;
     }
     io.out(`wrote ${CONFIG_FILE}, ${ENV_EXAMPLE}, ${Object.values(PROMPTS).length} prompts and ${STANDARDS}`);
+    io.out(nextSteps());
     return 0;
   } catch (error) {
     if (error instanceof InitError || (error as { code?: string }).code?.startsWith("ERR_PARSE_ARGS")) {

@@ -1,7 +1,7 @@
 // The one setup function of `castle-keep init` and of the first-run wizard:
 // both turn their choices into SetupChoices and call `writeSetup`, so the same choices give the same files.
 
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CONFIG_FILE, parseConfig, ROLES, type RoleName } from "./config.mts";
@@ -13,6 +13,8 @@ export const STANDARDS = "CODING_STANDARDS.md";
 /** The files setup copies from ./templates into `.sandcastle/`. */
 const COPIED = [...Object.values(PROMPTS), STANDARDS];
 export const ENV_EXAMPLE = ".sandcastle/.env.example";
+/** The local files of a run: setup adds the missing ones to `.gitignore`, since a run needs a clean checkout. */
+export const GITIGNORED = [".sandcastle/.env", ".sandcastle/logs/", ".sandcastle/worktrees/", ".sandcastle/run.pid"];
 
 const DEFAULT_MODELS: Record<RoleName, string> = {
   planner: "claude-haiku-5-5",
@@ -39,6 +41,8 @@ export interface SetupChoices {
   gates: string[];
   plugins: ModuleChoice[];
   baseBranch?: string;
+  /** Hook commands by key, for example `{ "sandbox.worktreeBuildup": ["npm ci"] }`. */
+  hooks?: Record<string, string[]>;
   /** Copy the generic prompts into `.sandcastle/`; default true. */
   copyPrompts?: boolean;
 }
@@ -56,7 +60,7 @@ function configText(choices: SetupChoices): string {
     roles: choices.roles,
     prompts: Object.fromEntries(Object.entries(PROMPTS).map(([key, file]) => [key, `./.sandcastle/${file}`])),
     gates: choices.gates,
-    hooks: {},
+    hooks: choices.hooks ?? {},
     plugins: choices.plugins,
     ...(choices.baseBranch ? { baseBranch: choices.baseBranch } : {}),
   };
@@ -79,5 +83,28 @@ export function writeSetup(cwd: string, choices: SetupChoices, force = false): S
   if (copy) for (const file of COPIED) copyFileSync(join(TEMPLATES, file), join(cwd, ".sandcastle", file));
   const keys = [...new Set([...Object.values(choices.roles).flatMap((r) => agents[r.agent]?.build({}).authEnv ?? []), ...parsed.source.build().env])];
   writeFileSync(join(cwd, ENV_EXAMPLE), `${keys.map((k) => `${k}=`).join("\n")}\n`);
-  return { ok: true, files: [...targets, ENV_EXAMPLE] };
+  const ignored = ignoreLocalFiles(cwd);
+  return { ok: true, files: [...targets, ENV_EXAMPLE, ...(ignored ? [".gitignore"] : [])] };
+}
+
+/** Appends the missing lines of GITIGNORED to `.gitignore`. Returns whether the file changed. */
+function ignoreLocalFiles(cwd: string): boolean {
+  const path = join(cwd, ".gitignore");
+  const text = existsSync(path) ? readFileSync(path, "utf8") : "";
+  const present = new Set(text.split("\n").map((line) => line.trim()));
+  const missing = GITIGNORED.filter((line) => !present.has(line));
+  if (missing.length === 0) return false;
+  const gap = text === "" ? "" : text.endsWith("\n") ? "\n" : "\n\n";
+  appendFileSync(path, `${gap}# castle-keep: secrets, logs, worktrees and the run lock stay local.\n${missing.join("\n")}\n`);
+  return true;
+}
+
+/** What a person does after setup, before the first `castle-keep run`. */
+export function nextSteps(): string {
+  const steps = [
+    `Put the keys of ${ENV_EXAMPLE} with their values in .sandcastle/.env.`,
+    "Commit .gitignore and .sandcastle/: a run starts only from a clean checkout.",
+    "Start the loop: npx castle-keep run",
+  ];
+  return ["Next:", ...steps.map((step, i) => `  ${i + 1}. ${step}`)].join("\n");
 }

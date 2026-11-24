@@ -27,13 +27,11 @@ import type { Mode } from "./policy.mts";
 import { preflightHere } from "./preflight.mts";
 
 export async function runSandcastle(configFile = CONFIG_FILE): Promise<never> {
-  // A start without a config opens the wizard on a terminal.
+  // A start without a config opens the wizard on a terminal and stops after it:
+  // the files it wrote must be committed before a run (the checkout must be clean).
   if (!existsSync(configFile) && process.stdout.isTTY && process.stdin.isTTY) {
-    const { runWizard } = await import("./wizard.tsx");
-    if (!(await runWizard(process.cwd()))) {
-      console.error("Not started: no config written.");
-      process.exit(1);
-    }
+    const { runSetup } = await import("./wizard.tsx");
+    process.exit(await runSetup(process.cwd()));
   }
   const reader = createConfigReader(configFile);
   const first = reader.read();

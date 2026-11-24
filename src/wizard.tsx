@@ -6,20 +6,28 @@
 import { Box, render, Text } from "ink";
 import { useState } from "react";
 import { z } from "zod";
-import { ConfigError, ROLES, type RoleName } from "./config.mts";
+import { ConfigError, CONFIG_FILE, ROLES, type RoleName } from "./config.mts";
 import { Form, Select } from "./form.tsx";
 import { pluginSchema, roleFormSchema, visiblePlugins } from "./sections.mts";
 import { ModuleEditor } from "./settings.tsx";
-import { defaultRoles, writeSetup, type ModuleChoice, type SetupChoices } from "./setup.mts";
+import { defaultRoles, nextSteps, writeSetup, type ModuleChoice, type SetupChoices } from "./setup.mts";
 
 const gateSchema = z.object({ gate: z.string().trim().min(1).describe("A command the reviewer runs as a check of each branch.") });
+const prepareSchema = z.object({
+  command: z
+    .string()
+    .trim()
+    .describe("A command that prepares each worktree before the agents start, for example npm ci. Empty for none."),
+});
+/** The hook key of the prepare step. */
+export const PREPARE_HOOK = "sandbox.worktreeBuildup";
 const COPY = "copy the generic prompts into .sandcastle/";
 const OWN = "I bring my own prompts";
 const CONTINUE = "continue";
 const ANOTHER = "add another check";
 const QUIT = "quit";
 const HELP: Record<string, string> = {
-  [CONTINUE]: "Goes on to the plugins with these checks.",
+  [CONTINUE]: "Goes on with these checks.",
   [ANOTHER]: "Asks one more command for the reviewer to run.",
   [COPY]: "Copies the generic prompts and CODING_STANDARDS.md; they are yours to edit after the copy.",
   [OWN]: "Copies nothing: the prompt files the config names must exist before the start.",
@@ -27,7 +35,7 @@ const HELP: Record<string, string> = {
 };
 const help = (option: string) => HELP[option];
 
-type Step = "source" | "sandbox" | { role: RoleName } | "gate" | "more-gates" | { plugin: string } | "prompts" | "write";
+type Step = "source" | "sandbox" | { role: RoleName } | "gate" | "more-gates" | "prepare" | { plugin: string } | "prompts" | "write";
 
 export function Wizard({ cwd, onDone }: { cwd: string; onDone: (written: boolean) => void }) {
   const [step, setStep] = useState<Step>("source");
@@ -99,7 +107,23 @@ export function Wizard({ cwd, onDone }: { cwd: string; onDone: (written: boolean
         title={`checks: ${choices.gates!.join(", ")}`}
         options={[CONTINUE, ANOTHER]}
         describe={help}
-        onPick={(option) => setStep(option === CONTINUE ? nextPlugin() : "gate")}
+        onPick={(option) => setStep(option === CONTINUE ? "prepare" : "gate")}
+      />
+    );
+  }
+  if (step === "prepare") {
+    return (
+      <Form
+        key={key}
+        title="prepare each worktree (a command, or empty)"
+        schema={prepareSchema}
+        value={{ command: "" }}
+        onCancel={() => setStep(nextPlugin())}
+        saveLabel="Next"
+        onSave={({ command }) => {
+          if (command) patch({ hooks: { [PREPARE_HOOK]: [command as string] } });
+          setStep(nextPlugin());
+        }}
       />
     );
   }
@@ -159,4 +183,18 @@ export async function runWizard(cwd: string): Promise<boolean> {
   const instance = render(<Wizard cwd={cwd} onDone={(ok) => { written = ok; instance.unmount(); }} />, { exitOnCtrlC: true });
   await instance.waitUntilExit();
   return written;
+}
+
+/**
+ * `castle-keep setup`, and `castle-keep run` without a config: the wizard, then the next steps.
+ * It never starts the loop: the files it wrote leave the checkout unclean until they are committed.
+ * Returns the exit code.
+ */
+export async function runSetup(cwd: string): Promise<number> {
+  if (!(await runWizard(cwd))) {
+    console.error("Setup ended: no config written.");
+    return 1;
+  }
+  console.log(`Wrote ${CONFIG_FILE}, the prompts and .gitignore.\n${nextSteps()}`);
+  return 0;
 }
