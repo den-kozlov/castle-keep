@@ -1,7 +1,10 @@
 {
   "source": {
     "module": "github",
-    "repo": "den-kozlov/castle-keep"
+    "repo": "den-kozlov/castle-keep",
+    "ready": "ready-for-agent",
+    "human": "ready-for-human",
+    "triage": "needs-triage"
   },
   "sandbox": {
     "module": "no-sandbox"
@@ -13,11 +16,13 @@
     },
     "implementer": {
       "agent": "claude-code",
-      "model": "claude-sonnet-5-5"
+      "model": "claude-opus-5-5",
+      "effort": "low"
     },
     "reviewer": {
       "agent": "claude-code",
-      "model": "claude-opus-5-5"
+      "model": "claude-opus-5-5",
+      "effort": "medium"
     },
     "merger": {
       "agent": "claude-code",
@@ -49,6 +54,9 @@
     },
     {
       "module": "github-pr"
+    },
+    {
+      "module": "orca"
     }
   ]
 }
